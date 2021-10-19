@@ -5,13 +5,9 @@
 
 void SideSurface::_init_weight(uchar thresh)
 {
-    float T = 2.5 * thresh;
-    for (int i = 0; i < 256; ++i)
+    for (int i = 0; i < 2.5 * thresh; ++i)
     {
-        if (i > T)
-            weight_table[i] = 0;
-        else
-            weight_table[i] = 2500 - i * 1000 / thresh;
+        weight_table[i] = 2500 - i * 1000 / thresh;
     }
 }
 
@@ -20,7 +16,7 @@ SideSurface::SideSurface(int h, int w, int r, uchar thresh)
       width(w),
       radius(r)
 {
-    weight_table = (int *)malloc(256 * sizeof(int));
+    weight_table = (int *)malloc(int(2.5 * thresh) * sizeof(int));
     _init_weight(thresh);
 
     // 将(4r+1)*(4r+1)的数组简化合并为5*5的数组
@@ -33,8 +29,8 @@ SideSurface::SideSurface(int h, int w, int r, uchar thresh)
 
     pwCell = (int *)malloc(25 * sizeof(int));
     wCell = (int *)malloc(25 * sizeof(int));
-    sumColPW = (int *)malloc(25 * sizeof(int));
-    sumColW = (int *)malloc(25 * sizeof(int));
+    sumColPW = (int *)malloc(15 * sizeof(int));
+    sumColW = (int *)malloc(15 * sizeof(int));
 }
 
 void SideSurface::run(const uchar *input, uchar *output)
@@ -86,38 +82,48 @@ void SideSurface::run(const uchar *input, uchar *output)
                 offsetCellPW += 2;
                 offsetCellW += 2;
             }
-
-            int candidate, diff, min_diff = 255;
-            for (int row = 0; row < 3; ++row)
-            {
-                offsetColPW = sumColPW + row * 3;
-                offsetColW = sumColW + row * 3;
-                for (int col = 0; col < 3; ++col)
-                {
-                    if (row != 1 || col != 1)
-                    {
-                        int weight = *offsetColW + *(offsetColW + 3) + *(offsetColW + 6);
-                        if (weight == 0)
-                            *xx = *x;
-                        else
-                        {
-                            candidate = (*offsetColPW + *(offsetColPW + 3) + *(offsetColPW + 6)) / weight;
-                            diff = std::abs(candidate - *x);
-                            if (diff < min_diff)
-                            {
-                                *xx = (uchar)candidate;
-                                min_diff = diff;
-                            }
-                        }
-                    }
-                    offsetColPW++;
-                    offsetColW++;
-                }
-            }
+            _calPix(x, xx);
             x++;
             xx++;
         }
     }
+}
+
+void SideSurface::_calPix(const uchar *x, uchar *xx)
+{
+    int candidate, diff, min_diff = 255;
+    int *offsetColPW = sumColPW;
+    int *offsetColW = sumColW;
+    for (int row = 0; row < 3; ++row)
+    {
+        for (int col = 0; col < 3; ++col)
+        {
+            if (row != 1 || col != 1)
+            {
+                int weight = *offsetColW + *(offsetColW + 3) + *(offsetColW + 6);
+                if (weight != 0)
+                {
+                    candidate = (*offsetColPW + *(offsetColPW + 3) + *(offsetColPW + 6)) / weight;
+                    diff = std::abs(candidate - *x);
+                    if (diff == 0)
+                    {
+                        *xx = *x;
+                        return;
+                    }
+                    if (diff < min_diff)
+                    {
+                        *xx = (uchar)candidate;
+                        min_diff = diff;
+                    }
+                }
+            }
+            offsetColPW++;
+            offsetColW++;
+        }
+    }
+    if (min_diff == 255)
+        *xx = *x;
+    return;
 }
 
 SideSurface::~SideSurface()
