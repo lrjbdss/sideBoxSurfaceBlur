@@ -1,13 +1,16 @@
 #include "side_box_surface_blur.h"
 #include <cmath>
 #include <memory.h>
-// #include "omp.h"
 
 void SideSurface::_init_weight(uchar thresh)
 {
-    for (int i = 0; i < 2.5 * thresh; ++i)
+    float T = 2.5 * thresh;
+    for (int i = 0; i < 256; ++i)
     {
-        weight_table[i] = 2500 - i * 1000 / thresh;
+        if (i > T)
+            weight_table[i] = 0;
+        else
+            weight_table[i] = 2500 - i * 1000 / thresh;
     }
 }
 
@@ -16,7 +19,7 @@ SideSurface::SideSurface(int h, int w, int r, uchar thresh)
       width(w),
       radius(r)
 {
-    weight_table = (int *)malloc(int(2.5 * thresh) * sizeof(int));
+    weight_table = (int *)malloc(256 * sizeof(int));
     _init_weight(thresh);
 
     // 将(4r+1)*(4r+1)的数组简化合并为5*5的数组
